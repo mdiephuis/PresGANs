@@ -4,11 +4,8 @@ import pickle
 import os
 import torchvision
 import random
-import scipy
 
-from scipy.spatial.distance import pdist, squareform
-
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from torchvision import transforms
 from skimage.transform import rescale
 
@@ -18,11 +15,12 @@ np.random.seed(2019)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 kwargs = {'num_workers': 4, 'pin_memory': True} if torch.cuda.is_available() else {}
 
-def load_data(name, dataroot, batch_size, device, imgsize=None, 
-                Ntrain=None, Ntest=None, n_mixtures=10, radius=3, std=0.05):
-    
+
+def load_data(name, dataroot, batch_size, device, imgsize=None,
+              Ntrain=None, Ntest=None, n_mixtures=10, radius=3, std=0.05):
+
     print('Loading dataset {} ...'.format(name.upper()))
-    data_path = dataroot+'/{}'.format(name)
+    data_path = dataroot + '/{}'.format(name)
 
     pkl_file = os.path.join(data_path, '{}_{}.pkl'.format(name, imgsize))
     if not os.path.exists(pkl_file):
@@ -36,35 +34,36 @@ def load_data(name, dataroot, batch_size, device, imgsize=None,
     else:
         with open(pkl_file, 'rb') as f:
             dat = pickle.load(f)
-    return dat 
+    return dat
+
 
 def create_data(name, data_path, batch_size, device, imgsize, Ntrain, Ntest, n_mixtures, radius, std):
     if name == 'ring':
-        delta_theta = 2*np.pi / n_mixtures
+        delta_theta = 2 * np.pi / n_mixtures
         centers_x = []
         centers_y = []
         for i in range(n_mixtures):
-            centers_x.append(radius*np.cos(i*delta_theta))
-            centers_y.append(radius*np.sin(i*delta_theta))
+            centers_x.append(radius * np.cos(i * delta_theta))
+            centers_y.append(radius * np.sin(i * delta_theta))
 
         centers_x = np.expand_dims(np.array(centers_x), 1)
         centers_y = np.expand_dims(np.array(centers_y), 1)
         centers = np.concatenate([centers_x, centers_y], 1)
 
         p = [1. / n_mixtures for _ in range(n_mixtures)]
-        
+
         ith_center = np.random.choice(n_mixtures, Ntrain, p=p)
         sample_centers = centers[ith_center, :]
         sample_points = np.random.normal(loc=sample_centers, scale=std).astype('float32')
 
         dat = {'X_train': torch.from_numpy(sample_points)}
- 
+
     elif name in ['mnist', 'stackedmnist']:
         nc = 1
         transform = transforms.Compose([
-                transforms.Resize(imgsize), 
-                transforms.ToTensor(),
-                transforms.Normalize((0.5,), (0.5,))]) 
+            transforms.Resize(imgsize),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5,), (0.5,))])
 
         mnist = torchvision.datasets.MNIST(root=data_path, download=True, transform=transform, train=True)
         train_loader = DataLoader(mnist, batch_size=1, shuffle=True, drop_last=True, num_workers=0)
@@ -102,10 +101,10 @@ def create_data(name, data_path, batch_size, device, imgsize, Ntrain, Ntest, n_m
     elif name == 'cifar10':
         nc = 3
         transform = transforms.Compose([
-                transforms.Resize(imgsize), 
-                transforms.ToTensor(),
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        
+            transforms.Resize(imgsize),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
         cifar = torchvision.datasets.CIFAR10(root=data_path, download=True, transform=transform, train=True)
         train_loader = DataLoader(cifar, batch_size=1, shuffle=True, num_workers=0)
         X_training = torch.zeros(len(train_loader), nc, imgsize, imgsize)
@@ -128,6 +127,7 @@ def create_data(name, data_path, batch_size, device, imgsize, Ntrain, Ntest, n_m
         raise NotImplementedError('Dataset not supported yet.')
 
     return dat
+
 
 def stack_mnist(data_dir, num_training_sample, num_test_sample, imageSize):
     # Load MNIST images... 60K in train and 10K in test
@@ -160,13 +160,13 @@ def stack_mnist(data_dir, num_training_sample, num_test_sample, imageSize):
         cnt = 0
         for j in range(ids.shape[1]):
             xij = trX[ids[i, j], :, :, 0]
-            xij = rescale(xij, (imageSize/28., imageSize/28.))
+            xij = rescale(xij, (imageSize / 28., imageSize / 28.))
             X_training[i, :, :, j] = xij
             cnt += trY[ids[i, j]] * (10**j)
         Y_training[i] = cnt
         if i % 10000 == 0:
             print('i: {}/{}'.format(i, ids.shape[0]))
-    X_training = X_training/255.
+    X_training = X_training / 255.
 
     ids = np.random.randint(0, teX.shape[0], size=(num_test_sample, 3))
     X_test = np.zeros(shape=(ids.shape[0], imageSize, imageSize, ids.shape[1]))
@@ -175,13 +175,13 @@ def stack_mnist(data_dir, num_training_sample, num_test_sample, imageSize):
         cnt = 0
         for j in range(ids.shape[1]):
             xij = teX[ids[i, j], :, :, 0]
-            xij = rescale(xij, (imageSize/28., imageSize/28.))
+            xij = rescale(xij, (imageSize / 28., imageSize / 28.))
             X_test[i, :, :, j] = xij
             cnt += teY[ids[i, j]] * (10**j)
         Y_test[i] = cnt
         if i % 1000 == 0:
             print('i: {}/{}'.format(i, ids.shape[0]))
-    X_test = X_test/255.
+    X_test = X_test / 255.
 
     X_training = torch.FloatTensor(2 * X_training - 1).permute(0, 3, 2, 1)
     X_test = torch.FloatTensor(2 * X_test - 1).permute(0, 3, 2, 1)
