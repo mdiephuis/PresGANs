@@ -1,13 +1,14 @@
 import torch.nn as nn
+import torch
 
-    
+
 class Generator(nn.Module):
     def __init__(self, imgSize, nz, ngf, nc):
         super(Generator, self).__init__()
-        
+
         self.main = nn.Sequential(
             # input is Z, going into a convolution
-            nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
+            nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
             nn.BatchNorm2d(ngf * 8),
             nn.ReLU(True),
             # state size. (ngf*8) x 4 x 4
@@ -19,11 +20,11 @@ class Generator(nn.Module):
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
             # state size. (ngf*2) x 16 x 16
-            nn.ConvTranspose2d(ngf * 2,    ngf, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.ReLU(True),
             # state size. (ngf) x 32 x 32
-            nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False),
             nn.Tanh()
             # state size. (nc) x 64 x 64
         )
@@ -32,10 +33,11 @@ class Generator(nn.Module):
         output = self.main(input)
         return output
 
+
 class Discriminator(nn.Module):
     def __init__(self, imgSize, ndf, nc):
         super(Discriminator, self).__init__()
-        
+
         self.main = nn.Sequential(
             # input is (nc) x 64 x 64
             nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
@@ -56,7 +58,33 @@ class Discriminator(nn.Module):
             nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
             nn.Sigmoid()
         )
-        
+
     def forward(self, input):
         output = self.main(input)
         return output.view(-1, 1).squeeze(1)
+
+
+class RingGenerator(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(RingGenerator, self).__init__()
+        self.map1 = nn.Linear(input_size, hidden_size)
+        self.map2 = nn.Linear(hidden_size, hidden_size)
+        self.map3 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = torch.tanh(self.map1(x))
+        x = torch.tanh(self.map2(x))
+        return self.map3(x)
+
+
+class RingDiscriminator(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(RingDiscriminator, self).__init__()
+        self.map1 = nn.Linear(input_size, hidden_size)
+        self.map2 = nn.Linear(hidden_size, hidden_size)
+        self.map3 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = torch.relu(self.map1(x))
+        x = torch.relu(self.map2(x))
+        return torch.sigmoid(self.map3(x))
